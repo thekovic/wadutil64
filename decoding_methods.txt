@@ -1,0 +1,13 @@
+menu background: jag
+status bar font: jag
+status bar lump: jag
+status bar symbol: jag
+sky cloud: jag
+sky fire: jag
+sky pic: jag
+sprite: jag
+texture: d64
+graphics for animation: d64
+player sprites: jag
+demos: d64
+map: d64
