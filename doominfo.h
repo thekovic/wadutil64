@@ -134,7 +134,7 @@ typedef enum {
 
 typedef enum
 {
-	S_000,
+    S_000,
     S_001,
     S_002,
     S_003,
@@ -931,24 +931,24 @@ typedef enum
     S_794,
     S_795,
     S_796,
-	NUMSTATES
+    NUMSTATES
 } statenum_t;
 
 typedef struct
 {
-	 spritenum_t	sprite;
-	 long			frame;
-	 long			tics;
-	 void			(*action) ();
-	 statenum_t		nextstate;
+     spritenum_t    sprite;
+     long           frame;
+     long           tics;
+     void           (*action) ();
+     statenum_t     nextstate;
 } state_t;
 
-extern state_t	states[NUMSTATES];
+extern state_t  states[NUMSTATES];
 extern char *sprnames[NUMSPRITES];
 
 typedef enum
 {
-	MT_PLAYER,              // 0
+    MT_PLAYER,              // 0
     MT_PLAYERBOT1,          // 1
     MT_PLAYERBOT2,          // 2
     MT_PLAYERBOT3,          // 3
@@ -1079,33 +1079,33 @@ typedef enum
     MT_GIB_HANGWHITEMEAT,   // 128
     MT_GIB_HANGHEAD,        // 129
     MT_GIB_HANGRIB,         // 130
-	NUMMOBJTYPES
+    NUMMOBJTYPES
 } mobjtype_t;
 
 typedef struct {
-	int	doomednum;
-	int	spawnstate;
-	int	spawnhealth;
-	int	seestate;
-	int	seesound;
-	int	reactiontime;
-	int	attacksound;
-	int	painstate;
-	int	painchance;
-	int	painsound;
-	int	meleestate;
-	int	missilestate;
-	int	deathstate;
-	int	xdeathstate;
-	int	deathsound;
-	int	speed;
-	int	radius;
-	int	height;
-	int	mass;
-	int	damage;
-	int	activesound;
-	int	flags;
-	int palette;
+    int doomednum;
+    int spawnstate;
+    int spawnhealth;
+    int seestate;
+    int seesound;
+    int reactiontime;
+    int attacksound;
+    int painstate;
+    int painchance;
+    int painsound;
+    int meleestate;
+    int missilestate;
+    int deathstate;
+    int xdeathstate;
+    int deathsound;
+    int speed;
+    int radius;
+    int height;
+    int mass;
+    int damage;
+    int activesound;
+    int flags;
+    int palette;
     int alpha;
 } mobjinfo_t;
 

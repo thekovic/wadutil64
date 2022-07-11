@@ -2,8 +2,6 @@
 
 #include "doomdef.h"
 
-#include "graph.h"
-
 /*=======*/
 /* TYPES */
 /*=======*/
@@ -81,7 +79,7 @@ static byte GetDecodeByte(void) // 8002D1D0
 static void WriteOutput(byte outByte) // 8002D214
 {
     if ((int)(decoder.writePos - decoder.write) >= OVERFLOW_WRITE)
-        I_Error("Overflowed output buffer");
+        printf("Overflowed output buffer");
 
     *decoder.writePos++ = outByte;
 }
@@ -229,7 +227,7 @@ static void InitDecodeTable(void) // 8002D468
     short *evenTbl;
     short *oddTbl;
 
-	tableVar01[15] = 3;
+    tableVar01[15] = 3;
     tableVar01[16] = 0;
     tableVar01[17] = 0;
 
@@ -283,19 +281,19 @@ static void InitDecodeTable(void) // 8002D468
     tableVar01[2] = incrVal;
 
     incrVal += (1 << ShiftTable[2]);
-	tableVar01[8] = (incrVal - 1);
+    tableVar01[8] = (incrVal - 1);
     tableVar01[3] = incrVal;
 
     incrVal += (1 << ShiftTable[3]);
-	tableVar01[9] = (incrVal - 1);
+    tableVar01[9] = (incrVal - 1);
     tableVar01[4] = incrVal;
 
     incrVal += (1 << ShiftTable[4]);
-	tableVar01[10] = (incrVal - 1);
+    tableVar01[10] = (incrVal - 1);
     tableVar01[5] = incrVal;
 
     incrVal += (1 << ShiftTable[5]);
-	tableVar01[11] = (incrVal - 1);
+    tableVar01[11] = (incrVal - 1);
     tableVar01[12] = (incrVal - 1);
 
     tableVar01[13] = tableVar01[12] + 64;
@@ -500,23 +498,23 @@ static int StartDecodeByte(void) // 8002D904
 
 void L8002d990(int arg0) // 8002D990
 {
-	int val;
+    int val;
 
-	val = ((allocPtr[(arg0 + 2) % tableVar01[13]] << 8) ^ (allocPtr[arg0] ^ (allocPtr[(arg0+1) % tableVar01[13]] << 4))) & 0x3fff;
+    val = ((allocPtr[(arg0 + 2) % tableVar01[13]] << 8) ^ (allocPtr[arg0] ^ (allocPtr[(arg0+1) % tableVar01[13]] << 4))) & 0x3fff;
 
-	if (PtrEvenTbl[val] == -1)
-	{
-		PtrOddTbl[val] = arg0;
-		PtrNumTbl1[arg0] = -1;
-	}
-	else
-	{
-		PtrNumTbl1[arg0] = PtrEvenTbl[val];
-		PtrNumTbl2[PtrEvenTbl[val]] = arg0;
-	}
+    if (PtrEvenTbl[val] == -1)
+    {
+        PtrOddTbl[val] = arg0;
+        PtrNumTbl1[arg0] = -1;
+    }
+    else
+    {
+        PtrNumTbl1[arg0] = PtrEvenTbl[val];
+        PtrNumTbl2[PtrEvenTbl[val]] = arg0;
+    }
 
-	PtrEvenTbl[val] = arg0;
-	PtrNumTbl2[arg0] = -1;
+    PtrEvenTbl[val] = arg0;
+    PtrNumTbl2[arg0] = -1;
 }
 
 /*
@@ -530,19 +528,19 @@ void L8002d990(int arg0) // 8002D990
 
 void FUN_8002dad0(int arg0) // 8002DAD0
 {
-	int val;
+    int val;
 
-	val = ((allocPtr[(arg0 + 2) % tableVar01[13]] << 8) ^ (allocPtr[arg0] ^ (allocPtr[(arg0+1) % tableVar01[13]] << 4))) & 0x3fff;
+    val = ((allocPtr[(arg0 + 2) % tableVar01[13]] << 8) ^ (allocPtr[arg0] ^ (allocPtr[(arg0+1) % tableVar01[13]] << 4))) & 0x3fff;
 
-	if (PtrEvenTbl[val] == PtrOddTbl[val])
-	{
-		PtrEvenTbl[val] = -1;
-	}
-	else
-	{
-		PtrNumTbl1[PtrNumTbl2[PtrOddTbl[val]]] = -1;
-		PtrOddTbl[val] = PtrNumTbl2[PtrOddTbl[val]];
-	}
+    if (PtrEvenTbl[val] == PtrOddTbl[val])
+    {
+        PtrEvenTbl[val] = -1;
+    }
+    else
+    {
+        PtrNumTbl1[PtrNumTbl2[PtrOddTbl[val]]] = -1;
+        PtrOddTbl[val] = PtrNumTbl2[PtrOddTbl[val]];
+    }
 }
 
 /*
@@ -708,24 +706,24 @@ void FUN_8002df14(void) // 8002DF14
 void DecodeD64(unsigned char *input, unsigned char *output) // 8002DFA0
 {
     int copyPos, storePos;
-	int dec_byte, resc_byte;
-	int incrBit, copyCnt, shiftPos, j;
+    int dec_byte, resc_byte;
+    int incrBit, copyCnt, shiftPos, j;
 
-	//PRINTF_D2(WHITE, 0, 15, "DecodeD64");
+    //PRINTF_D2(WHITE, 0, 15, "DecodeD64");
 
-	InitDecodeTable();
+    InitDecodeTable();
 
-	OVERFLOW_READ = MAXINT;
+    OVERFLOW_READ = MAXINT;
     OVERFLOW_WRITE = MAXINT;
 
-	incrBit = 0;
+    incrBit = 0;
 
-	decoder.read = input;
-	decoder.readPos = input;
-	decoder.write = output;
-	decoder.writePos = output;
+    decoder.read = input;
+    decoder.readPos = input;
+    decoder.write = output;
+    decoder.writePos = output;
 
-	allocPtr = (byte *)Z_Alloc(tableVar01[13], PU_STATIC, NULL);
+    allocPtr = (byte *)malloc(tableVar01[13]);
 
     dec_byte = StartDecodeByte();
 
@@ -805,9 +803,9 @@ void DecodeD64(unsigned char *input, unsigned char *output) // 8002DFA0
         dec_byte = StartDecodeByte();
     }
 
-	Z_Free(allocPtr);
+    free(allocPtr);
 
-	//PRINTF_D2(WHITE, 0, 21, "DecodeD64:End");
+    //PRINTF_D2(WHITE, 0, 21, "DecodeD64:End");
 }
 
 /*
@@ -820,37 +818,37 @@ void DecodeD64(unsigned char *input, unsigned char *output) // 8002DFA0
 == == == == == == == == == ==
 */
 
-#define WINDOW_SIZE	4096
-#define LOOKAHEAD_SIZE	16
+#define WINDOW_SIZE 4096
+#define LOOKAHEAD_SIZE  16
 
-#define LENSHIFT 4		/* this must be log2(LOOKAHEAD_SIZE) */
+#define LENSHIFT 4      /* this must be log2(LOOKAHEAD_SIZE) */
 
 void DecodeJaguar(unsigned char *input, unsigned char *output) // 8002E1f4
 {
     int getidbyte = 0;
-	int len;
-	int pos;
-	int i;
-	unsigned char *source;
-	int idbyte = 0;
+    int len;
+    int pos;
+    int i;
+    unsigned char *source;
+    int idbyte = 0;
 
-	while (1)
-	{
-		/* get a new idbyte if necessary */
-		if (!getidbyte) idbyte = *input++;
-		getidbyte = (getidbyte + 1) & 7;
+    while (1)
+    {
+        /* get a new idbyte if necessary */
+        if (!getidbyte) idbyte = *input++;
+        getidbyte = (getidbyte + 1) & 7;
 
-		if (idbyte & 1)
-		{
-			/* decompress */
-			pos = *input++ << LENSHIFT;
-			pos = pos | (*input >> LENSHIFT);
-			source = output - pos - 1;
-			len = (*input++ & 0xf) + 1;
-			if (len == 1) break;
+        if (idbyte & 1)
+        {
+            /* decompress */
+            pos = *input++ << LENSHIFT;
+            pos = pos | (*input >> LENSHIFT);
+            source = output - pos - 1;
+            len = (*input++ & 0xf) + 1;
+            if (len == 1) break;
 
-			//for (i = 0; i<len; i++)
-				//*output++ = *source++;
+            //for (i = 0; i<len; i++)
+                //*output++ = *source++;
 
             i = 0;
             if (len > 0)
@@ -874,12 +872,12 @@ void DecodeJaguar(unsigned char *input, unsigned char *output) // 8002E1f4
                     i += 4;
                 }
             }
-		}
-		else
+        }
+        else
         {
-			*output++ = *input++;
-		}
+            *output++ = *input++;
+        }
 
-		idbyte = idbyte >> 1;
-	}
+        idbyte = idbyte >> 1;
+    }
 }
