@@ -1,6 +1,25 @@
 #include "doomdef.h"
 
-int main(int argc, char **argv) {
+void choose_decode_mode(byte *decode_mode, char *lump_name)
+{
+    char MAP01_name[6] = "MAP01";
+    MAP01_name[0] += 0x80;
+    if (!strcmp(lump_name, "T_START"))
+    {
+        *decode_mode = dec_d64;
+    }
+    else if (!strcmp(lump_name, "T_END"))
+    {
+        *decode_mode = dec_jag;
+    }
+    else if (!strcmp(lump_name, MAP01_name))
+    {
+        *decode_mode = dec_d64;
+    }
+}
+
+int main(int argc, char **argv)
+{
     if (argc != 3)
     {
         printf("Improper arguments!\n");
@@ -31,7 +50,7 @@ int main(int argc, char **argv) {
 
     wadinfo_t wad_header;
     fread(&wad_header, sizeof(wadinfo_t), 1, wad);
-    printf("WAD name: %s", argv[2]);
+    printf("WAD name: %s\n", argv[2]);
     printf("Number of lumps: %d, Address to directory: %X\n", wad_header.numlumps, wad_header.infotableofs);
 
     lumpinfo_t *lump_directory = malloc(wad_header.numlumps * sizeof(lumpinfo_t));
@@ -49,6 +68,8 @@ int main(int argc, char **argv) {
 
     fwrite(&wad_header, sizeof(wadinfo_t), 1, output);
     
+    byte decode_mode = 1;
+    size_t total_size = 12;
     for (int i = 1; i < wad_header.numlumps - 1; ++i)
     {
         size_t lump_size = lump_directory[i+1].filepos - lump_directory[i].filepos;
@@ -58,15 +79,51 @@ int main(int argc, char **argv) {
             printf("ERROR: Could not read WAD lump %d.", i);
             return EXIT_FAILURE;
         }
+        byte *true_lump_data = malloc(lump_directory[i].size);
+        if (!true_lump_data)
+        {
+            printf("ERROR: Could not decompress WAD lump %d.", i);
+            return EXIT_FAILURE;
+        }
+
+        choose_decode_mode(&decode_mode, lump_directory[i].name);
 
         fseek(wad, lump_directory[i].filepos, SEEK_SET);
         fread(lump_data, lump_size, 1, wad);
-        fwrite(lump_data, lump_size, 1, output);
-        free(lump_data);
+
+        if (lump_directory[i].name[0] & 0x80)
+        {
+            lump_directory[i].name[0] -= 0x80;
+            if (decode_mode == dec_jag)
+            {
+                DecodeJaguar(lump_data, true_lump_data);
+            }
+            else if (decode_mode == dec_d64)
+            {
+                DecodeD64(lump_data, true_lump_data);
+            }
+            lump_directory[i].filepos = lump_directory[i - 1].filepos + lump_directory[i - 1].size;
+            total_size += lump_directory[i].size;
+            free(lump_data);
+        }
+        else
+        {
+            free(true_lump_data);
+            true_lump_data = lump_data;
+            lump_directory[i].filepos = lump_directory[i - 1].filepos + lump_directory[i - 1].size;
+            total_size += lump_directory[i].size;
+        }
+        fwrite(true_lump_data, lump_directory[i].size, 1, output);
+        free(true_lump_data);
     }
     
-    fseek(wad, wad_header.infotableofs, SEEK_SET);
+    lump_directory[wad_header.numlumps - 1].filepos
+        = lump_directory[wad_header.numlumps - 2].filepos + lump_directory[wad_header.numlumps - 2].size;
     fwrite(lump_directory, sizeof(lumpinfo_t), wad_header.numlumps, output);
+
+    wad_header.infotableofs = total_size;
+    fseek(output, 0, SEEK_SET);
+    fwrite(&wad_header, sizeof(wadinfo_t), 1, output);
     
     fclose(output);
     fclose(wad);
