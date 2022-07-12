@@ -28,7 +28,7 @@
 static const char rcsid[] = "$Id: DeflateN64.c 1251 2014-01-14 04:13:33Z svkaiser $";
 #endif
 
-#include "WadGen.h"
+#include "doomdef.h"
 
 typedef struct {
     int var0;
@@ -700,7 +700,7 @@ void InitCountTable()
 
 
 static byte BinaryTest[32] = {0};
-void MakeBinary(int lookup, bool save = true)
+void MakeBinary(int lookup, bool save)
 {
      byte *tablePtr1 = DecodeTable;                  // $s2
      byte *tablePtr2 = (byte*)(DecodeTable+0x4F0);   // $s1
@@ -877,7 +877,7 @@ void Deflate_Encode(byte *input, int size)
          
          //Make Binary
          LooKupCode = (input[incrBitFile] + 0x0275);
-         MakeBinary(LooKupCode);
+         MakeBinary(LooKupCode, true);
          MakeByte();
              
          incrBit++;
@@ -1110,7 +1110,7 @@ void Deflate_Encode(byte *input, int size)
                
                if(make)
                {
-                   MakeBinary(LooKupCode);
+                   MakeBinary(LooKupCode, true);
                    MakeByte();
                    MakeExtraBinary(ValExtra, Shift);
                    MakeByte();
@@ -1141,7 +1141,7 @@ void Deflate_Encode(byte *input, int size)
                    //Make Binary
                    LooKupCode = (input[incrBitFile] + 0x0275);
                    //setcolor2(0x0A);printf("Code 0x%04X -> 0x%02X\n", LooKupCode, input[incrBitFile]);setcolor2(0x07);
-                   MakeBinary(LooKupCode);
+                   MakeBinary(LooKupCode, true);
                    MakeByte();
                              
                    incrBit++;
@@ -1164,7 +1164,7 @@ void Deflate_Encode(byte *input, int size)
              //Make Binary
              LooKupCode = (input[incrBitFile] + 0x0275);
              //setcolor2(0x0A);printf("Code 0x%04X -> 0x%02X\n", LooKupCode, input[incrBitFile]);setcolor2(0x07);
-             MakeBinary(LooKupCode);
+             MakeBinary(LooKupCode, true);
              MakeByte();
                      
              incrBit++;
@@ -1178,7 +1178,7 @@ void Deflate_Encode(byte *input, int size)
          }
      }
      
-     MakeBinary(0x0375);
+     MakeBinary(0x0375, true);
      MakeByte();
      
      

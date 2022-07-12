@@ -7,5 +7,6 @@ set(EXECUTABLE_OUTPUT_PATH ..)
 add_executable(Doom64Compressor
     main.c
 	decodes.c
+	encodes.c
 	w_wad.c
 )
