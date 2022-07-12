@@ -203,14 +203,14 @@ void    Z_DumpHeap(memzone_t *mainzone);
 // New Doom64
 typedef enum
 {
-    dec_none,
-    dec_jag,
-    dec_d64
+    DECODE_NONE,
+    DECODE_JAGUAR,
+    DECODE_D64
 } decodetype;
 
 typedef struct
 {
-    int         filepos;                    /* also texture_t * for comp lumps */
+    int         filepos;
     int         size;
     char        name[8];
 } lumpinfo_t;
@@ -218,13 +218,6 @@ typedef struct
 typedef struct {
     void       *cache;
 } lumpcache_t;
-
-//extern    lumpinfo_t  *lumpinfo;      /* points directly to rom image */
-//extern    int         numlumps;
-//extern    lumpcache_t *lumpcache;
-//extern    byte        *mapfileptr;    // psxdoom/d64
-//extern    int         mapnumlumps;    // psxdoom/d64
-//extern    lumpinfo_t  *maplump;       // psxdoom/d64
 
 void    W_Init (void);
 

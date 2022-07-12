@@ -185,14 +185,14 @@ void W_ReadLump (int lump, void *dest, decodetype dectype) // 8002C260
         printf ("W_ReadLump: lump %i out of range",lump);
 
     l = &lumpinfo[lump];
-    if(dectype != dec_none)
+    if(dectype != DECODE_NONE)
     {
         if ((l->name[0] & 0x80)) /* compressed */
         {
             lumpsize = l[1].filepos - (l->filepos);
             input = malloc(lumpsize);
 
-            if (dectype == dec_jag)
+            if (dectype == DECODE_JAGUAR)
                 DecodeJaguar((byte *)input, (byte *)dest);
             else // dec_d64
                 DecodeD64((byte *)input, (byte *)dest);
@@ -231,7 +231,7 @@ void *W_CacheLumpNum (int lump, int tag, decodetype dectype) // 8002C430
         //if (dectype == dec_d64)
             //ST_DebugPrint("W_CacheLumpNum: lump %i", lump);
 
-        if (dectype == dec_none)
+        if (dectype == DECODE_NONE)
             lumpsize = lumpinfo[lump + 1].filepos - lumpinfo[lump].filepos;
         else
             lumpsize = lumpinfo[lump].size;
@@ -302,7 +302,7 @@ void W_OpenMapWad(int mapnum) // 8002C5B0
 
     mapfileptr = malloc(size);
 
-    W_ReadLump(lump, mapfileptr, dec_d64);
+    W_ReadLump(lump, mapfileptr, DECODE_D64);
 
     mapnumlumps = ((wadinfo_t*)mapfileptr)->numlumps;
     infotableofs = ((wadinfo_t*)mapfileptr)->infotableofs;
