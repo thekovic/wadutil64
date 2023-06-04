@@ -64,6 +64,26 @@ void wadutil64_help()
     printf("    Padding: wadutil64.exe -p DOOM64.WAD\n");
 }
 
+lumpinfo_t* read_lump_directory(FILE* WAD, int number_of_lumps, int offset)
+{
+    // Allocate space in memory for lump directory into
+    lumpinfo_t* lump_directory = (lumpinfo_t*) malloc(number_of_lumps * sizeof(lumpinfo_t));
+    if (!lump_directory)
+    {
+        printf("ERROR: Could not read WAD lumps.");
+        exit(EXIT_FAILURE);
+    }
+
+    // Read the lump directory
+    fseek(WAD, offset, SEEK_SET);
+    for (int i = 0; i < number_of_lumps; ++i)
+    {
+        fread(lump_directory + i, sizeof(lumpinfo_t), 1, WAD);
+    }
+
+    return lump_directory;
+}
+
 byte* read_lump(FILE* WAD, int offset, int size)
 {
     byte* lump_data = (byte*) malloc(size);
@@ -136,20 +156,8 @@ void decompress_WAD(FILE* input_WAD, FILE* output_WAD)
     printf("WAD name: %s\n", input_file_name);
     printf("Number of lumps: %d, Address to lump directory: %X\n", wad_header.numlumps, wad_header.infotableofs);
 
-    // Allocate space in memory for lump directory into
-    lumpinfo_t* lump_directory = (lumpinfo_t*) malloc(wad_header.numlumps * sizeof(lumpinfo_t));
-    if (!lump_directory)
-    {
-        printf("ERROR: Could not read WAD lumps.");
-        exit(EXIT_FAILURE);
-    }
-
-    // Read the lump directory
-    fseek(input_WAD, wad_header.infotableofs, SEEK_SET);
-    for (int i = 0; i < wad_header.numlumps; ++i)
-    {
-        fread(lump_directory + i, sizeof(lumpinfo_t), 1, input_WAD);
-    }
+    // Read list of all lumps
+    lumpinfo_t* lump_directory = read_lump_directory(input_WAD, wad_header.numlumps, wad_header.infotableofs);
 
     fwrite(&wad_header, sizeof(wadinfo_t), 1, output_WAD);
     int total_size = sizeof(wadinfo_t);
@@ -171,10 +179,6 @@ void decompress_WAD(FILE* input_WAD, FILE* output_WAD)
     for (int i = 1; i < wad_header.numlumps - 1; ++i)
     {
         int lump_size = lump_directory[i+1].filepos - lump_directory[i].filepos;
-        if (lump_size < 0)
-        {
-            lump_size = lump_directory[i].size;
-        }
 
         process_decompress_lump(input_WAD, output_WAD, &(lump_directory[i]), lump_size, &decode_mode);
 
@@ -191,6 +195,8 @@ void decompress_WAD(FILE* input_WAD, FILE* output_WAD)
     wad_header.infotableofs = total_size;
     fseek(output_WAD, 0, SEEK_SET);
     fwrite(&wad_header, sizeof(wadinfo_t), 1, output_WAD);
+
+    free(lump_directory);
 }
 
 void compress_WAD(FILE* input_WAD, FILE* output_WAD)
@@ -198,9 +204,78 @@ void compress_WAD(FILE* input_WAD, FILE* output_WAD)
     printf("TODO: WAD COMPRESSION!!!\n");
 }
 
+byte* pad_lump(FILE* WAD, lumpinfo_t* lump_info)
+{
+    int mod = lump_info->size % 4;
+    int padding = (mod != 0) ? 4 - mod : 0;
+
+    byte* lump_data = read_lump(WAD, lump_info->filepos, lump_info->size);
+
+    if (padding > 0)
+    {
+        // Calculate new size
+        int padded_size = lump_info->size + padding;
+        
+        // Copy lump data with padding
+        byte* padded_lump_data = (byte*) malloc(padded_size);
+        memset(padded_lump_data, 0, padded_size);
+        memcpy(padded_lump_data, lump_data, lump_info->size);
+
+        // Fix entry in lump directory
+        lump_info->size = padded_size;
+
+        free(lump_data);
+        lump_data = padded_lump_data;
+    }
+
+    return lump_data;
+}
+
 void pad_WAD(FILE* input_WAD, FILE* output_WAD)
 {
-    printf("TODO: WAD PADDING!!!\n");
+    // Read WAD header
+    wadinfo_t wad_header;
+    fread(&wad_header, sizeof(wadinfo_t), 1, input_WAD);
+
+    // Read list of all lumps
+    lumpinfo_t* lump_directory = read_lump_directory(input_WAD, wad_header.numlumps, wad_header.infotableofs);
+
+    fwrite(&wad_header, sizeof(wadinfo_t), 1, output_WAD);
+    int total_size = sizeof(wadinfo_t);
+
+    // Pad first lump
+    {
+        byte* lump_data = pad_lump(input_WAD, &(lump_directory[0]));
+
+        lump_directory[0].filepos = sizeof(wadinfo_t);
+        total_size += lump_directory[0].size;
+
+        fwrite(lump_data, lump_directory[0].size, 1, output_WAD);
+        free(lump_data);
+    }
+
+    for (int i = 1; i < wad_header.numlumps - 1; ++i)
+    {
+        byte* lump_data = pad_lump(input_WAD, &(lump_directory[i]));
+
+        lump_directory[i].filepos = lump_directory[i - 1].filepos + lump_directory[i - 1].size;
+        total_size += lump_directory[i].size;
+
+        fwrite(lump_data, lump_directory[i].size, 1, output_WAD);
+        free(lump_data);
+    }
+
+    // Fix address of last lump in WAD
+    lump_directory[wad_header.numlumps - 1].filepos = lump_directory[wad_header.numlumps - 2].filepos + lump_directory[wad_header.numlumps - 2].size;
+    // Write lump directory
+    fwrite(lump_directory, sizeof(lumpinfo_t), wad_header.numlumps, output_WAD);
+
+    // Fix header using new size of WAD
+    wad_header.infotableofs = total_size;
+    fseek(output_WAD, 0, SEEK_SET);
+    fwrite(&wad_header, sizeof(wadinfo_t), 1, output_WAD);
+
+    free(lump_directory);
 }
 
 int main(int argc, char** argv)
