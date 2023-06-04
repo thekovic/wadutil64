@@ -2,14 +2,16 @@
 
 typedef enum
 {
-    DECOMPRESS,
-    COMPRESS
-} d64compressor_mode;
+    EXTRACT_MODE,
+    DECOMPRESS_MODE,
+    COMPRESS_MODE,
+    PAD_MODE
+} wadutil64_mode;
 
 static char input_file_name[128];
 static char output_file_name[128];
 
-void choose_decode_mode(byte *decode_mode, char *lump_name)
+void choose_decode_mode(byte* decode_mode, char* lump_name)
 {
     char MAP01_name[6] = "MAP01";
     MAP01_name[0] += 0x80;
@@ -27,22 +29,29 @@ void choose_decode_mode(byte *decode_mode, char *lump_name)
     }
 }
 
-void d64compressor_help()
+void wadutil64_help()
 {
     printf("Improper arguments!\n");
     printf("USAGE:\n");
-    printf("    Decompression: Doom64Compressor.exe -d DOOM64.WAD\n");
-    printf("    Compression: Doom64Compressor.exe -c DOOM64.WAD\n");
+    printf("    Extraction: wadutil64.exe -e DOOM64_ROM.z64\n");
+    printf("    Decompression: wadutil64.exe -d DOOM64.WAD\n");
+    printf("    Compression: wadutil64.exe -c DOOM64.WAD\n");
+    printf("    Padding: wadutil64.exe -p DOOM64.WAD\n");
 }
 
-void decompress_WAD(FILE *input_WAD, FILE *output_WAD)
+void extract_WAD(FILE* input_ROM, FILE* output_WAD)
+{
+    printf("TODO: WAD EXTRACTION!!!\n");
+}
+
+void decompress_WAD(FILE* input_WAD, FILE* output_WAD)
 {
     wadinfo_t wad_header;
     fread(&wad_header, sizeof(wadinfo_t), 1, input_WAD);
     printf("WAD name: %s\n", input_file_name);
     printf("Number of lumps: %d, Address to directory: %X\n", wad_header.numlumps, wad_header.infotableofs);
 
-    lumpinfo_t *lump_directory = malloc(wad_header.numlumps * sizeof(lumpinfo_t));
+    lumpinfo_t* lump_directory = (lumpinfo_t*) malloc(wad_header.numlumps * sizeof(lumpinfo_t));
     if (!lump_directory)
     {
         printf("ERROR: Could not read WAD lumps.");
@@ -62,13 +71,13 @@ void decompress_WAD(FILE *input_WAD, FILE *output_WAD)
     for (int i = 1; i < wad_header.numlumps - 1; ++i)
     {
         size_t lump_size = lump_directory[i+1].filepos - lump_directory[i].filepos;
-        byte *lump_data = malloc(lump_size);
+        byte* lump_data = (byte*) malloc(lump_size);
         if (!lump_data)
         {
             printf("ERROR: Could not read WAD lump %d.", i);
             exit(EXIT_FAILURE);
         }
-        byte *true_lump_data = malloc(lump_directory[i].size);
+        byte* true_lump_data = (byte*) malloc(lump_directory[i].size);
         if (!true_lump_data)
         {
             printf("ERROR: Could not decompress WAD lump %d.", i);
@@ -115,71 +124,95 @@ void decompress_WAD(FILE *input_WAD, FILE *output_WAD)
     fwrite(&wad_header, sizeof(wadinfo_t), 1, output_WAD);
 }
 
-void compress_WAD(FILE *input_WAD, FILE *output_WAD)
+void compress_WAD(FILE* input_WAD, FILE* output_WAD)
 {
     printf("TODO: WAD COMPRESSION!!!\n");
 }
 
-int main(int argc, char **argv)
+void pad_WAD(FILE* input_WAD, FILE* output_WAD)
+{
+    printf("TODO: WAD PADDING!!!\n");
+}
+
+int main(int argc, char** argv)
 {
     if (argc != 3)
     {
-        d64compressor_help();
+        wadutil64_help();
         return EXIT_FAILURE;
     }
 
-    byte program_mode;
-    if (argv[1][1] == 'd')
-    {
-        program_mode = DECOMPRESS;
-        printf("Decompression mode enabled!\n");
-    }
-    else if (argv[1][1] == 'c')
-    {
-        program_mode = COMPRESS;
-        printf("Compression mode enabled!\n");
-    }
-    else
-    {
-        d64compressor_help();
-        return EXIT_FAILURE;
-    }
-
+    // Open input file
     strncpy(input_file_name, argv[2], 128);
-    FILE *wad = fopen(input_file_name, "rb");
-    if (!wad)
+    FILE* input_file = fopen(input_file_name, "rb");
+    if (!input_file)
     {
-        printf("ERROR: WAD file %s not found!\n", input_file_name);
+        printf("ERROR: Input file %s not found!\n", input_file_name);
         return EXIT_FAILURE;
     }
 
+    // Modify output file name
     strncpy(output_file_name, input_file_name, 128);
     output_file_name[strlen(output_file_name) - 4] = 0;
-    if (program_mode == DECOMPRESS)
+
+    byte program_mode;
+    char program_mode_user_input = argv[1][1];
+    switch (program_mode_user_input)
     {
+    case 'e':
+        program_mode = EXTRACT_MODE;
+        strcat(output_file_name, "_extract.WAD");
+        printf("Extraction mode enabled!\n");
+        break;
+    case 'd':
+        program_mode = DECOMPRESS_MODE;
         strcat(output_file_name, "_decomp.WAD");
-    }
-    else
-    {
+        printf("Decompression mode enabled!\n");
+        break;
+    case 'c':
+        program_mode = COMPRESS_MODE;
         strcat(output_file_name, "_comp.WAD");
+        printf("Compression mode enabled!\n");
+        break;
+    case 'p':
+        program_mode = PAD_MODE;
+        strcat(output_file_name, "_pad.WAD");
+        printf("Padding mode enabled!\n");
+        break;
+    default:
+        wadutil64_help();
+        return EXIT_FAILURE;
     }
-    FILE *output = fopen(output_file_name, "wb");
-    if (!output)
+
+    // Create output file
+    FILE* output_file = fopen(output_file_name, "wb");
+    if (!output_file)
     {
         printf("ERROR: Could not write decompressed WAD!\n");
         return EXIT_FAILURE;
     }
 
-    if (program_mode == DECOMPRESS)
+    switch (program_mode)
     {
-        decompress_WAD(wad, output);
-    }
-    else
-    {
-        compress_WAD(wad, output);
+    case EXTRACT_MODE:
+        extract_WAD(input_file, output_file);
+        break;
+    case DECOMPRESS_MODE:
+        decompress_WAD(input_file, output_file);
+        break;
+    case COMPRESS_MODE:
+        compress_WAD(input_file, output_file);
+        break;
+    case PAD_MODE:
+        pad_WAD(input_file, output_file);
+        break;
+    
+    default:
+        break;
     }
     
-    fclose(output);
-    fclose(wad);
+    fclose(input_file);
+    fclose(output_file);
+    
     return EXIT_SUCCESS;
 }

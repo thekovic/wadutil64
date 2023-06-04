@@ -190,7 +190,7 @@ void W_ReadLump (int lump, void *dest, decodetype dectype) // 8002C260
         if ((l->name[0] & 0x80)) /* compressed */
         {
             lumpsize = l[1].filepos - (l->filepos);
-            input = malloc(lumpsize);
+            input = (byte*) malloc(lumpsize);
 
             if (dectype == DECODE_JAGUAR)
                 DecodeJaguar((byte *)input, (byte *)dest);
@@ -300,7 +300,7 @@ void W_OpenMapWad(int mapnum) // 8002C5B0
     //printf("lump %d           ",lump);
     //printf("size %d           \n",size);
 
-    mapfileptr = malloc(size);
+    mapfileptr = (byte*)malloc(size);
 
     W_ReadLump(lump, mapfileptr, DECODE_D64);
 

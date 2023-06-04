@@ -54,4 +54,5 @@ dkms.conf
 /build
 /.vscode
 *.wad
+*.z64
 output.txt

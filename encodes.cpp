@@ -24,10 +24,8 @@
 // DESCRIPTION: Deflate decompression in Doom64. Needs A LOT of cleanup and proper variable naming
 //
 //-----------------------------------------------------------------------------
-#ifdef RCSID
-static const char rcsid[] = "$Id: DeflateN64.c 1251 2014-01-14 04:13:33Z svkaiser $";
-#endif
-
+#include <vector>
+#include <algorithm>
 #include "doomdef.h"
 
 typedef struct {
@@ -441,8 +439,7 @@ int Deflate_RescanByte(int byte) {
 
 void Deflate_WriteOutput(byte outByte) {
     if(!((decoder.writePos - decoder.write) < OVERFLOWCHECK)) {
-        //I_Error("Overflowed output buffer");
-        WGen_Complain("Overflowed output buffer");
+        printf("Overflowed output buffer");
         return;
     }
 
@@ -889,7 +886,8 @@ void Deflate_Encode(byte *input, int size)
      {
          if(incrBitFile > size) break;
          
-         float prc = CLAMP(((float)((incrBitFile))) /(size), 0.0, 1.0);
+         float orig_v = ((float)((incrBitFile))) /(size);
+         float prc = std::clamp(orig_v, 0.0f, 1.0f);
          printf("Compress (%%%.2f)\n", prc*100);
          
          offset = 0;
