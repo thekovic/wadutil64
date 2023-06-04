@@ -713,8 +713,8 @@ void DecodeD64(unsigned char *input, unsigned char *output) // 8002DFA0
 
     InitDecodeTable();
 
-    OVERFLOW_READ = MAXINT;
-    OVERFLOW_WRITE = MAXINT;
+    OVERFLOW_READ = ((int)0x7fffffff);
+    OVERFLOW_WRITE = ((int)0x7fffffff);
 
     incrBit = 0;
 

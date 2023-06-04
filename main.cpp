@@ -8,6 +8,27 @@ typedef enum
     PAD_MODE
 } wadutil64_mode;
 
+typedef enum
+{
+    DECODE_NONE,
+    DECODE_JAGUAR,
+    DECODE_D64
+} decodetype;
+
+typedef struct
+{
+    int         filepos;
+    int         size;
+    char        name[8];
+} lumpinfo_t;
+
+typedef struct
+{
+    char        identification[4];      /* should be IWAD */
+    int         numlumps;
+    int         infotableofs;
+} wadinfo_t;
+
 static char input_file_name[128];
 static char output_file_name[128];
 
@@ -15,7 +36,11 @@ void choose_decode_mode(byte* decode_mode, char* lump_name)
 {
     char MAP01_name[6] = "MAP01";
     MAP01_name[0] += 0x80;
-    if (!strcmp(lump_name, "T_START"))
+    if (!strcmp(lump_name, "S_START"))
+    {
+        *decode_mode = DECODE_JAGUAR;
+    }
+    else if (!strcmp(lump_name, "T_START"))
     {
         *decode_mode = DECODE_D64;
     }
@@ -39,86 +64,130 @@ void wadutil64_help()
     printf("    Padding: wadutil64.exe -p DOOM64.WAD\n");
 }
 
+byte* read_lump(FILE* WAD, int offset, int size)
+{
+    byte* lump_data = (byte*) malloc(size);
+    if (!lump_data)
+    {
+        printf("ERROR: Could not read WAD lump at %i of size %i.", offset, size);
+        exit(EXIT_FAILURE);
+    }
+
+    fseek(WAD, offset, SEEK_SET);
+    fread(lump_data, size, 1, WAD);
+
+    return lump_data;
+}
+
 void extract_WAD(FILE* input_ROM, FILE* output_WAD)
 {
     printf("TODO: WAD EXTRACTION!!!\n");
 }
 
+byte* decompress_lump_data(byte* lump_data, int new_size, byte decode_mode)
+{
+    byte* decompressed_lump = (byte*) malloc(new_size);
+    if (!decompressed_lump)
+    {
+        printf("ERROR: Could not decompress WAD lump.");
+        exit(EXIT_FAILURE);
+    }
+
+    if (decode_mode == DECODE_JAGUAR)
+    {
+        DecodeJaguar(lump_data, decompressed_lump);
+    }
+    else if (decode_mode == DECODE_D64)
+    {
+        DecodeD64(lump_data, decompressed_lump);
+    }
+
+    free(lump_data);
+    return decompressed_lump;
+}
+
+void process_decompress_lump(FILE* input_WAD, FILE* output_WAD, lumpinfo_t* lump_info, int size, byte* decode_mode)
+{
+    choose_decode_mode(decode_mode, lump_info->name);
+    // If empty marker lump, don't even bother and try to decompress
+    if (size <= 0)
+    {
+        return;
+    }
+
+    byte* lump_data = read_lump(input_WAD, lump_info->filepos, size);
+
+    if (lump_info->name[0] & 0x80)
+    {
+        lump_info->name[0] -= 0x80;
+        //printf("DECOMP LUMP\n");
+        lump_data = decompress_lump_data(lump_data, lump_info->size, *decode_mode);
+    }
+
+    fwrite(lump_data, lump_info->size, 1, output_WAD);
+    free(lump_data);
+}
+
 void decompress_WAD(FILE* input_WAD, FILE* output_WAD)
 {
+    // Read WAD header
     wadinfo_t wad_header;
     fread(&wad_header, sizeof(wadinfo_t), 1, input_WAD);
     printf("WAD name: %s\n", input_file_name);
-    printf("Number of lumps: %d, Address to directory: %X\n", wad_header.numlumps, wad_header.infotableofs);
+    printf("Number of lumps: %d, Address to lump directory: %X\n", wad_header.numlumps, wad_header.infotableofs);
 
+    // Allocate space in memory for lump directory into
     lumpinfo_t* lump_directory = (lumpinfo_t*) malloc(wad_header.numlumps * sizeof(lumpinfo_t));
     if (!lump_directory)
     {
         printf("ERROR: Could not read WAD lumps.");
         exit(EXIT_FAILURE);
     }
-    fseek(input_WAD, wad_header.infotableofs, SEEK_SET);
 
+    // Read the lump directory
+    fseek(input_WAD, wad_header.infotableofs, SEEK_SET);
     for (int i = 0; i < wad_header.numlumps; ++i)
     {
         fread(lump_directory + i, sizeof(lumpinfo_t), 1, input_WAD);
     }
 
     fwrite(&wad_header, sizeof(wadinfo_t), 1, output_WAD);
-    
-    byte decode_mode = 1;
-    size_t total_size = 12;
-    for (int i = 1; i < wad_header.numlumps - 1; ++i)
+    int total_size = sizeof(wadinfo_t);
+
+    byte decode_mode = DECODE_D64;
+
+    // Process first lump
     {
-        size_t lump_size = lump_directory[i+1].filepos - lump_directory[i].filepos;
-        byte* lump_data = (byte*) malloc(lump_size);
-        if (!lump_data)
-        {
-            printf("ERROR: Could not read WAD lump %d.", i);
-            exit(EXIT_FAILURE);
-        }
-        byte* true_lump_data = (byte*) malloc(lump_directory[i].size);
-        if (!true_lump_data)
-        {
-            printf("ERROR: Could not decompress WAD lump %d.", i);
-            exit(EXIT_FAILURE);
-        }
+        int lump_size = lump_directory[1].filepos - sizeof(wadinfo_t);
+        
+        process_decompress_lump(input_WAD, output_WAD, &(lump_directory[0]), lump_size, &decode_mode);
 
-        choose_decode_mode(&decode_mode, lump_directory[i].name);
-
-        fseek(input_WAD, lump_directory[i].filepos, SEEK_SET);
-        fread(lump_data, lump_size, 1, input_WAD);
-
-        if (lump_directory[i].name[0] & 0x80)
-        {
-            lump_directory[i].name[0] -= 0x80;
-            if (decode_mode == DECODE_JAGUAR)
-            {
-                DecodeJaguar(lump_data, true_lump_data);
-            }
-            else if (decode_mode == DECODE_D64)
-            {
-                DecodeD64(lump_data, true_lump_data);
-            }
-            lump_directory[i].filepos = lump_directory[i - 1].filepos + lump_directory[i - 1].size;
-            total_size += lump_directory[i].size;
-            free(lump_data);
-        }
-        else
-        {
-            free(true_lump_data);
-            true_lump_data = lump_data;
-            lump_directory[i].filepos = lump_directory[i - 1].filepos + lump_directory[i - 1].size;
-            total_size += lump_directory[i].size;
-        }
-        fwrite(true_lump_data, lump_directory[i].size, 1, output_WAD);
-        free(true_lump_data);
+        lump_directory[0].filepos = sizeof(wadinfo_t);
+        total_size += lump_directory[0].size;
     }
     
-    lump_directory[wad_header.numlumps - 1].filepos
-        = lump_directory[wad_header.numlumps - 2].filepos + lump_directory[wad_header.numlumps - 2].size;
+    // Process all other lumps except the last one
+    // We (reasonably) assume that last lump is an empty marker
+    for (int i = 1; i < wad_header.numlumps - 1; ++i)
+    {
+        int lump_size = lump_directory[i+1].filepos - lump_directory[i].filepos;
+        if (lump_size < 0)
+        {
+            lump_size = lump_directory[i].size;
+        }
+
+        process_decompress_lump(input_WAD, output_WAD, &(lump_directory[i]), lump_size, &decode_mode);
+
+        lump_directory[i].filepos = lump_directory[i - 1].filepos + lump_directory[i - 1].size;
+        total_size += lump_directory[i].size;
+    }
+    
+    // Fix address of last lump in WAD
+    lump_directory[wad_header.numlumps - 1].filepos = lump_directory[wad_header.numlumps - 2].filepos + lump_directory[wad_header.numlumps - 2].size;
+    // Write lump directory
     fwrite(lump_directory, sizeof(lumpinfo_t), wad_header.numlumps, output_WAD);
 
+    // Fix header using new size of WAD
     wad_header.infotableofs = total_size;
     fseek(output_WAD, 0, SEEK_SET);
     fwrite(&wad_header, sizeof(wadinfo_t), 1, output_WAD);
@@ -196,15 +265,19 @@ int main(int argc, char** argv)
     {
     case EXTRACT_MODE:
         extract_WAD(input_file, output_file);
+        printf("Extraction complete!\n");
         break;
     case DECOMPRESS_MODE:
         decompress_WAD(input_file, output_file);
+        printf("Decompression complete!\n");
         break;
     case COMPRESS_MODE:
         compress_WAD(input_file, output_file);
+        printf("Compression complete!\n");
         break;
     case PAD_MODE:
         pad_WAD(input_file, output_file);
+        printf("Padding complete!\n");
         break;
     
     default:

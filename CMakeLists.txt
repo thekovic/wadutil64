@@ -16,5 +16,4 @@ add_executable(wadutil64
     main.cpp
 	decodes.cpp
 	encodes.cpp
-	w_wad.cpp
 )
