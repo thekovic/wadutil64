@@ -1,6 +1,6 @@
 /* decodes.c */
 
-#include "doomdef.h"
+#include "wadutil64_def.h"
 
 /*=======*/
 /* TYPES */

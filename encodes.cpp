@@ -26,7 +26,7 @@
 //-----------------------------------------------------------------------------
 #include <vector>
 #include <algorithm>
-#include "doomdef.h"
+#include "wadutil64_def.h"
 
 typedef struct {
     int var0;

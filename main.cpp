@@ -1,4 +1,4 @@
-#include "doomdef.h"
+#include "wadutil64_def.h"
 
 typedef enum
 {
@@ -167,7 +167,6 @@ void decompress_WAD(FILE* input_WAD, FILE* output_WAD)
     // Process first lump
     {
         int lump_size = lump_directory[1].filepos - sizeof(wadinfo_t);
-        
         process_decompress_lump(input_WAD, output_WAD, &(lump_directory[0]), lump_size, &decode_mode);
 
         lump_directory[0].filepos = sizeof(wadinfo_t);
@@ -175,19 +174,24 @@ void decompress_WAD(FILE* input_WAD, FILE* output_WAD)
     }
     
     // Process all other lumps except the last one
-    // We (reasonably) assume that last lump is an empty marker
     for (int i = 1; i < wad_header.numlumps - 1; ++i)
     {
         int lump_size = lump_directory[i+1].filepos - lump_directory[i].filepos;
-
         process_decompress_lump(input_WAD, output_WAD, &(lump_directory[i]), lump_size, &decode_mode);
 
         lump_directory[i].filepos = lump_directory[i - 1].filepos + lump_directory[i - 1].size;
         total_size += lump_directory[i].size;
     }
     
-    // Fix address of last lump in WAD
-    lump_directory[wad_header.numlumps - 1].filepos = lump_directory[wad_header.numlumps - 2].filepos + lump_directory[wad_header.numlumps - 2].size;
+    // Process last lump
+    {
+        int lump_size = wad_header.infotableofs - lump_directory[wad_header.numlumps - 1].filepos;
+        process_decompress_lump(input_WAD, output_WAD, &(lump_directory[wad_header.numlumps - 1]), lump_size, &decode_mode);
+
+        lump_directory[wad_header.numlumps - 1].filepos = lump_directory[wad_header.numlumps - 2].filepos + lump_directory[wad_header.numlumps - 2].size;
+        total_size += lump_directory[wad_header.numlumps - 1].size;
+    }
+
     // Write lump directory
     fwrite(lump_directory, sizeof(lumpinfo_t), wad_header.numlumps, output_WAD);
 
@@ -254,7 +258,7 @@ void pad_WAD(FILE* input_WAD, FILE* output_WAD)
         free(lump_data);
     }
 
-    for (int i = 1; i < wad_header.numlumps - 1; ++i)
+    for (int i = 1; i < wad_header.numlumps; ++i)
     {
         byte* lump_data = pad_lump(input_WAD, &(lump_directory[i]));
 
@@ -265,8 +269,6 @@ void pad_WAD(FILE* input_WAD, FILE* output_WAD)
         free(lump_data);
     }
 
-    // Fix address of last lump in WAD
-    lump_directory[wad_header.numlumps - 1].filepos = lump_directory[wad_header.numlumps - 2].filepos + lump_directory[wad_header.numlumps - 2].size;
     // Write lump directory
     fwrite(lump_directory, sizeof(lumpinfo_t), wad_header.numlumps, output_WAD);
 
