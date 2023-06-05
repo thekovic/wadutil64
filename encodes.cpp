@@ -24,7 +24,6 @@
 // DESCRIPTION: Deflate decompression in Doom64. Needs A LOT of cleanup and proper variable naming
 //
 //-----------------------------------------------------------------------------
-#include <vector>
 #include <algorithm>
 #include "wadutil64_def.h"
 
@@ -628,10 +627,10 @@ void Deflate_Decompress(byte *input, byte *output) {
 // ---------------------------------------------------------------//
 
 std::vector<byte> BinCode;
-std::vector<byte> OutFile;
-FILE *out;
+std::vector<byte> OutFile(1024 * 1024 *4);
+//FILE *out;
 static int OutputSize = 0;
-int MakeByte()
+void MakeByte()
 {
     int mult = 1;
     //for (int BinCnt = 0; BinCnt < BinCode.size();)
@@ -643,7 +642,7 @@ int MakeByte()
         if(!BinCode.size()){break;}
         if(BinCode.size() < 8){break;}
         
-        int byte = 8;
+        int tmpbyte = 8;
         int i = 0;              // $s1
         int shift = 1;          // $s0
         int resultbyte = 0;     // $s2
@@ -661,7 +660,7 @@ int MakeByte()
             shift = (shift << 1);
             //printf("binary %x\n",binary);
         }
-        while(i != byte);
+        while(i != tmpbyte);
         
         for(binary = 0; binary < i; binary++)//Remove first 8 bytes
         {
@@ -670,7 +669,9 @@ int MakeByte()
         
         //printf("resultbyte shift %x\n",resultbyte);
         
-        fwrite (&resultbyte,sizeof(unsigned char), 1 ,out);
+        //fwrite (&resultbyte,sizeof(unsigned char), 1 ,out);
+        byte* the_byte_result = (byte*) (&resultbyte);
+        OutFile.push_back(*the_byte_result);
         OutputSize ++;
         //getch();
     }
@@ -824,7 +825,9 @@ void MakeExtraBinary(int Value, int Shift)
      //setcolor2(0x07);
 }
 
-void Deflate_Encode(byte *input, int size)
+int last_prc = 0;
+
+std::vector<byte> Deflate_Encode(byte *input, int size)
 {
      int v[2];
      int a[4];
@@ -859,7 +862,8 @@ void Deflate_Encode(byte *input, int size)
      InitCountTable();
      Deflate_InitDecodeTable();
      
-     out = fopen ("Compress.bin","wb");
+     OutFile.clear();
+     //out = fopen ("Compress.bin","wb");
      
      incrBitFile = 0;
      incrBit = 0;
@@ -888,7 +892,13 @@ void Deflate_Encode(byte *input, int size)
          
          float orig_v = ((float)((incrBitFile))) /(size);
          float prc = std::clamp(orig_v, 0.0f, 1.0f);
-         printf("Compress (%%%.2f)\n", prc*100);
+         int prc_int = static_cast<int>(prc*100);
+         if (prc_int % 10 == 0 && prc_int != last_prc)
+         {
+            last_prc = prc_int;
+            printf("Compress (%d %)\n", prc_int);
+         }
+         //printf("Compress (%%%.2f)\n", prc*100);
          
          offset = 0;
          copy = false;
@@ -1188,12 +1198,14 @@ void Deflate_Encode(byte *input, int size)
         {
           //*output++ = 0;
           int val = 0x00;
-          fwrite (&val, sizeof(unsigned char), 1 ,out);
+          byte* the_byte_val = (byte*) (&val);
+          //fwrite (&val, sizeof(unsigned char), 1 ,out);
+          OutFile.push_back(*the_byte_val);
         }
      }
      
-     fclose(out);
-     
+     //fclose(out);
+     return OutFile;
     /* TEST
     FILE *f3 = fopen ("Alloc2.bin","wb");
     for(i = 0; i < Max; i++)

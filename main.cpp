@@ -35,7 +35,7 @@ static char output_file_name[128];
 void choose_decode_mode(byte* decode_mode, char* lump_name)
 {
     char MAP01_name[6] = "MAP01";
-    MAP01_name[0] += 0x80;
+    
     if (!strcmp(lump_name, "S_START"))
     {
         *decode_mode = DECODE_JAGUAR;
@@ -49,6 +49,12 @@ void choose_decode_mode(byte* decode_mode, char* lump_name)
         *decode_mode = DECODE_JAGUAR;
     }
     else if (!strcmp(lump_name, MAP01_name))
+    {
+        *decode_mode = DECODE_D64;
+    }
+
+    MAP01_name[0] += 0x80;
+    if (!strcmp(lump_name, MAP01_name))
     {
         *decode_mode = DECODE_D64;
     }
@@ -126,7 +132,7 @@ byte* decompress_lump_data(byte* lump_data, int new_size, byte decode_mode)
     return decompressed_lump;
 }
 
-void process_decompress_lump(FILE* input_WAD, FILE* output_WAD, lumpinfo_t* lump_info, int size, byte* decode_mode)
+void decompress_and_write_lump(FILE* input_WAD, FILE* output_WAD, lumpinfo_t* lump_info, int size, byte* decode_mode)
 {
     choose_decode_mode(decode_mode, lump_info->name);
     // If empty marker lump, don't even bother and try to decompress
@@ -140,7 +146,10 @@ void process_decompress_lump(FILE* input_WAD, FILE* output_WAD, lumpinfo_t* lump
     if (lump_info->name[0] & 0x80)
     {
         lump_info->name[0] -= 0x80;
-        //printf("DECOMP LUMP\n");
+        char lump_name[9];
+        strncpy(lump_name, lump_info->name, 8);
+        lump_name[8] = 0;
+        printf("Decompressing lump: %s\n", lump_name);
         lump_data = decompress_lump_data(lump_data, lump_info->size, *decode_mode);
     }
 
@@ -162,12 +171,12 @@ void decompress_WAD(FILE* input_WAD, FILE* output_WAD)
     fwrite(&wad_header, sizeof(wadinfo_t), 1, output_WAD);
     int total_size = sizeof(wadinfo_t);
 
-    byte decode_mode = DECODE_D64;
+    byte decode_mode = DECODE_NONE;
 
     // Process first lump
     {
         int lump_size = lump_directory[1].filepos - sizeof(wadinfo_t);
-        process_decompress_lump(input_WAD, output_WAD, &(lump_directory[0]), lump_size, &decode_mode);
+        decompress_and_write_lump(input_WAD, output_WAD, &(lump_directory[0]), lump_size, &decode_mode);
 
         lump_directory[0].filepos = sizeof(wadinfo_t);
         total_size += lump_directory[0].size;
@@ -177,7 +186,7 @@ void decompress_WAD(FILE* input_WAD, FILE* output_WAD)
     for (int i = 1; i < wad_header.numlumps - 1; ++i)
     {
         int lump_size = lump_directory[i+1].filepos - lump_directory[i].filepos;
-        process_decompress_lump(input_WAD, output_WAD, &(lump_directory[i]), lump_size, &decode_mode);
+        decompress_and_write_lump(input_WAD, output_WAD, &(lump_directory[i]), lump_size, &decode_mode);
 
         lump_directory[i].filepos = lump_directory[i - 1].filepos + lump_directory[i - 1].size;
         total_size += lump_directory[i].size;
@@ -186,7 +195,7 @@ void decompress_WAD(FILE* input_WAD, FILE* output_WAD)
     // Process last lump
     {
         int lump_size = wad_header.infotableofs - lump_directory[wad_header.numlumps - 1].filepos;
-        process_decompress_lump(input_WAD, output_WAD, &(lump_directory[wad_header.numlumps - 1]), lump_size, &decode_mode);
+        decompress_and_write_lump(input_WAD, output_WAD, &(lump_directory[wad_header.numlumps - 1]), lump_size, &decode_mode);
 
         lump_directory[wad_header.numlumps - 1].filepos = lump_directory[wad_header.numlumps - 2].filepos + lump_directory[wad_header.numlumps - 2].size;
         total_size += lump_directory[wad_header.numlumps - 1].size;
@@ -203,9 +212,86 @@ void decompress_WAD(FILE* input_WAD, FILE* output_WAD)
     free(lump_directory);
 }
 
+int compress_and_write_lump(FILE* input_WAD, FILE* output_WAD, lumpinfo_t* lump_info, byte* decode_mode)
+{
+    choose_decode_mode(decode_mode, lump_info->name);
+    // If empty marker lump, don't even bother and try to decompress
+    if (lump_info->size <= 0)
+    {
+        return 0;
+    }
+
+    byte* lump_data = read_lump(input_WAD, lump_info->filepos, lump_info->size);
+    bool can_free = true;
+    int lump_size = lump_info->size;
+    std::vector<byte> compressed_lump_data;
+    
+    if (*decode_mode == DECODE_JAGUAR)
+    {
+        // TODO: implement Jaguar Doom's compression (should be standard LZSS)
+    }
+    else if (*decode_mode == DECODE_D64)
+    {
+        char lump_name[9];
+        strncpy(lump_name, lump_info->name, 8);
+        lump_name[8] = 0;
+        printf("Compressing lump: %s\n", lump_name);
+
+        lump_info->name[0] += 0x80;
+        compressed_lump_data = Deflate_Encode(lump_data, lump_info->size);
+        lump_size = static_cast<int>(compressed_lump_data.size());
+        lump_data = compressed_lump_data.data();
+        can_free = false;
+    }
+    
+    fwrite(lump_data, lump_size, 1, output_WAD);
+    if (can_free)
+    {
+        free(lump_data);
+    }
+
+    return lump_size;
+}
+
 void compress_WAD(FILE* input_WAD, FILE* output_WAD)
 {
-    printf("TODO: WAD COMPRESSION!!!\n");
+    // Read WAD header
+    wadinfo_t wad_header;
+    fread(&wad_header, sizeof(wadinfo_t), 1, input_WAD);
+    printf("WAD name: %s\n", input_file_name);
+    printf("Number of lumps: %d, Address to lump directory: %X\n", wad_header.numlumps, wad_header.infotableofs);
+
+    // Read list of all lumps
+    lumpinfo_t* lump_directory = read_lump_directory(input_WAD, wad_header.numlumps, wad_header.infotableofs);
+
+    fwrite(&wad_header, sizeof(wadinfo_t), 1, output_WAD);
+    int total_size = sizeof(wadinfo_t);
+
+    byte decode_mode = DECODE_NONE;
+
+    // Process first lump
+    {
+        total_size += compress_and_write_lump(input_WAD, output_WAD, &(lump_directory[0]), &decode_mode);
+        lump_directory[0].filepos = sizeof(wadinfo_t);
+    }
+    
+    // Process all other lumps
+    for (int i = 1; i < wad_header.numlumps; ++i)
+    {
+        int compressed_size = compress_and_write_lump(input_WAD, output_WAD, &(lump_directory[i]), &decode_mode);
+        lump_directory[i].filepos = total_size;
+        total_size += compressed_size;
+    }
+
+    // Write lump directory
+    fwrite(lump_directory, sizeof(lumpinfo_t), wad_header.numlumps, output_WAD);
+
+    // Fix header using new size of WAD
+    wad_header.infotableofs = total_size;
+    fseek(output_WAD, 0, SEEK_SET);
+    fwrite(&wad_header, sizeof(wadinfo_t), 1, output_WAD);
+
+    free(lump_directory);
 }
 
 byte* pad_lump(FILE* WAD, lumpinfo_t* lump_info)
@@ -240,6 +326,8 @@ void pad_WAD(FILE* input_WAD, FILE* output_WAD)
     // Read WAD header
     wadinfo_t wad_header;
     fread(&wad_header, sizeof(wadinfo_t), 1, input_WAD);
+    printf("WAD name: %s\n", input_file_name);
+    printf("Number of lumps: %d, Address to lump directory: %X\n", wad_header.numlumps, wad_header.infotableofs);
 
     // Read list of all lumps
     lumpinfo_t* lump_directory = read_lump_directory(input_WAD, wad_header.numlumps, wad_header.infotableofs);
@@ -282,6 +370,8 @@ void pad_WAD(FILE* input_WAD, FILE* output_WAD)
 
 int main(int argc, char** argv)
 {
+    std::ios::sync_with_stdio(false);
+
     if (argc != 3)
     {
         wadutil64_help();
@@ -349,8 +439,11 @@ int main(int argc, char** argv)
         printf("Decompression complete!\n");
         break;
     case COMPRESS_MODE:
+#if 0
         compress_WAD(input_file, output_file);
         printf("Compression complete!\n");
+#endif
+        printf("TODO: Compression not implemented yet.");
         break;
     case PAD_MODE:
         pad_WAD(input_file, output_file);
