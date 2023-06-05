@@ -10,8 +10,6 @@ else()
     add_compile_options(-Wall -Wextra)
 endif()
 
-set(EXECUTABLE_OUTPUT_PATH ..)
-
 add_executable(wadutil64
     main.cpp
 	decodes.cpp
